@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, FlatList, Image } from 'react-native';
+import { View, FlatList, Image, TouchableOpacity } from 'react-native';
 import { Appbar, Card, Text, ActivityIndicator, FAB } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/src/lib/http';
@@ -17,19 +17,21 @@ export default function HomeScreen() {
           data={data || []}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <Card style={{ margin: 12 }}>
-              <Card.Title title={item.author.displayName} subtitle={`@${item.author.handle}`} />
-              <Card.Content>
-                <Text>{item.content}</Text>
-              </Card.Content>
-              {item.media?.length ? (
+            <TouchableOpacity onPress={() => router.push(`/tweet/${item.id}`)}>
+              <Card style={{ margin: 12 }}>
+                <Card.Title title={item.author.displayName} subtitle={`@${item.author.handle}`} />
                 <Card.Content>
-                  {item.media.map((m: any) => (
-                    <Image key={m.id} source={{ uri: m.url }} style={{ height: 200, borderRadius: 8, marginTop: 8 }} />
-                  ))}
+                  <Text>{item.content}</Text>
                 </Card.Content>
-              ) : null}
-            </Card>
+                {item.media?.length ? (
+                  <Card.Content>
+                    {item.media.map((m: any) => (
+                      <Image key={m.id} source={{ uri: m.url }} style={{ height: 200, borderRadius: 8, marginTop: 8 }} />
+                    ))}
+                  </Card.Content>
+                ) : null}
+              </Card>
+            </TouchableOpacity>
           )}
         />
       )}

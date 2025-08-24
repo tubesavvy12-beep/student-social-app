@@ -5,6 +5,33 @@ import { z } from 'zod';
 
 const router = Router();
 
+// Feed: friends/following first, then popular
+router.get('/feed/home', requireAuth, async (req: AuthedRequest, res) => {
+  const userId = req.userId!;
+
+  const following = await prisma.follow.findMany({ where: { followerId: userId }, select: { followingId: true } });
+  const followingIds = following.map(f => f.followingId);
+
+  const followingTweets = await prisma.tweet.findMany({
+    where: { authorId: { in: [...followingIds, userId] }, visibility: 'PUBLIC' },
+    include: { media: true, author: true },
+    orderBy: { createdAt: 'desc' },
+    take: 50
+  });
+
+  const popularTweets = await prisma.tweet.findMany({
+    where: { authorId: { notIn: [...followingIds, userId] }, visibility: 'PUBLIC' },
+    include: { media: true, author: true },
+    orderBy: [
+      { likeCount: 'desc' },
+      { createdAt: 'desc' }
+    ],
+    take: 50
+  });
+
+  res.json([...followingTweets, ...popularTweets]);
+});
+
 const createTweetSchema = z.object({
   content: z.string().min(1).max(1000),
   media: z.array(z.object({ url: z.string().url(), type: z.enum(['IMAGE', 'VIDEO']), width: z.number().optional(), height: z.number().optional(), duration: z.number().optional() })).default([]),
@@ -35,6 +62,15 @@ router.get('/:id', async (req, res) => {
   res.json(tweet);
 });
 
+router.get('/:id/comments', async (req, res) => {
+  const comments = await prisma.comment.findMany({
+    where: { tweetId: req.params.id },
+    include: { author: true },
+    orderBy: { createdAt: 'asc' }
+  });
+  res.json(comments);
+});
+
 router.post('/:id/like', requireAuth, async (req: AuthedRequest, res) => {
   const id = req.params.id;
   try {
@@ -62,33 +98,6 @@ router.post('/:id/comment', requireAuth, async (req: AuthedRequest, res) => {
   const comment = await prisma.comment.create({ data: { content, authorId: req.userId!, tweetId: id, parentId: parentId || null } });
   await prisma.tweet.update({ where: { id }, data: { commentCount: { increment: 1 } } });
   res.json(comment);
-});
-
-// Feed: friends/following first, then popular
-router.get('/feed/home', requireAuth, async (req: AuthedRequest, res) => {
-  const userId = req.userId!;
-
-  const following = await prisma.follow.findMany({ where: { followerId: userId }, select: { followingId: true } });
-  const followingIds = following.map(f => f.followingId);
-
-  const followingTweets = await prisma.tweet.findMany({
-    where: { authorId: { in: [...followingIds, userId] }, visibility: 'PUBLIC' },
-    include: { media: true, author: true },
-    orderBy: { createdAt: 'desc' },
-    take: 50
-  });
-
-  const popularTweets = await prisma.tweet.findMany({
-    where: { authorId: { notIn: [...followingIds, userId] }, visibility: 'PUBLIC' },
-    include: { media: true, author: true },
-    orderBy: [
-      { likeCount: 'desc' },
-      { createdAt: 'desc' }
-    ],
-    take: 50
-  });
-
-  res.json([...followingTweets, ...popularTweets]);
 });
 
 export default router;
